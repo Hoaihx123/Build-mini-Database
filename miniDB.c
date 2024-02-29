@@ -10,7 +10,7 @@
 #define TABLE_MAX_PAGE 100
 #define INVALID_PAGE_NUM UINT32_MAX
 
-typedef enum { STATEMENT_INSERT, STATEMENT_SELECT} StatementType;
+typedef enum { STATEMENT_INSERT, STATEMENT_SELECT, STATEMENT_SELECT_BY_ID} StatementType;
 typedef enum { NODE_LEAF, NODE_INTERNAL} NodeType;
 
 typedef struct{
@@ -30,6 +30,7 @@ typedef struct {
 } Row;
 typedef struct {
   StatementType type;
+  uint32_t key;
   Row row_to_insert;
 } Statement;
 typedef struct{
@@ -171,9 +172,14 @@ bool prepare_statement(InputBuffer* inp_buf, Statement* stm){
     }
     return true;
   }
-  if (strcmp(inp_buf->buffer, "select")==0){
-    stm->type = STATEMENT_SELECT;
-    return true;
+  if (strncmp(inp_buf->buffer, "select", 6)==0) {
+    if (strcmp(inp_buf->buffer, "select")==0){
+      stm->type = STATEMENT_SELECT;
+      return true;
+    } else if (sscanf(inp_buf->buffer, "select id=%d", &(stm->key))==1){
+      stm->type = STATEMENT_SELECT_BY_ID;
+      return true;
+    }
   }
   return false;
 }
@@ -274,7 +280,6 @@ uint32_t internal_find(Table* table, uint32_t key, uint32_t page_num){
   while (start!=end) {
     mid = (start+end)/2;
     node_key = *internal_node_key(node, mid);
-    printf("%d %d\n", node_key, key);
     if (node_key==key){
       return mid;
     } else if (node_key<key){
@@ -422,7 +427,6 @@ void leaf_node_split_and_insert(Cursor* cur, Row* value, uint32_t key) {
 void insert_to_leaf(Cursor* cur, Row* value, uint32_t key){
   void* node = get_page(cur->table->pager, cur->page_num);
   uint32_t num_cell = *leaf_node_num_cells(node);
-  printf("%d\n", LEAF_NODE_MAX_CELLS);
   if (num_cell >= LEAF_NODE_MAX_CELLS){
     leaf_node_split_and_insert(cur, value, key);
     return;
@@ -493,9 +497,7 @@ void recursive_print(Table* table, uint32_t page_num){
       print_row(row);
     }
   } else {
-    printf("%d\n", table->root_page_num);
-
-    printf("%d %d\n",*internal_node_num_key(node), page_num);
+    printf("page num %d\n", page_num);
     printf("[");
     for (uint32_t i=0; i<num_cells; i++){
       printf("%d, ", *internal_node_key(node, i));
@@ -516,13 +518,22 @@ bool execute_statement(Statement* stm, Table* table){
     case STATEMENT_SELECT:
       execute_select(table);
       return true;
+    case STATEMENT_SELECT_BY_ID:
+      Cursor* cur = table_find(table, stm->key, table->root_page_num);
+      void* node = get_page(table->pager, cur->page_num);
+      if ((*leaf_node_key(node, cur->cell_num)==stm->key)&& (*leaf_node_num_cells(node)>cur->cell_num)){
+        Row row;
+        deserialize_row(&row, leaf_node_value(node, cur->cell_num));
+        print_row(row);
+      } else {
+        printf("not found row when id = %d\n", stm->key);
+      }
   }
 }
 
 int main(int argc, char const *argv[]) {
   InputBuffer* inp_buf = new_inp_buf();
   Table* table = open_db("data.db");
-  printf("%d\n", INVALID_PAGE_NUM);
   while (1){
     print_pr();
     read_input(inp_buf);
