@@ -22,7 +22,7 @@ So, In this application, I only deploy a database consisting of 1 table and basi
 - .exit - exit and save the data
 
 The application is written in C, data is deployed in B+ tree and saved in data.db file.
-We read and flush data into the file through structs Pager. Pager contains an array of pointers to pages as the page is read from the hard drive, each page is 4 kb long and stores the data of a node in tree B.
+We read and flush data into the file through structs Pager. Pager contains an array of pointers to pages as the page is read from the hard drive, each page is 4 kb long and stores the data of a node in B-tree.
 
  
 
