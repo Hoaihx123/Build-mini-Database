@@ -31,6 +31,7 @@ We read and flush data into the file through structs Pager. Pager contains an ar
 In each B-tree there are 2 types of nodes:
 - Leaf node
 - Internal node
+  
 At the beginning of each common node, we use byte 0 to store the node's format, byte 1 to store the boolean value is_root, and the next 4 bytes the address of the parent page.
 
 For leaf nodes, use bytes 6-9 (the next 4 bytes) to store the number of rows in the page. Then it will save rows containing keys and values ​​in turn.
