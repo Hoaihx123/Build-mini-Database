@@ -10,7 +10,7 @@
 #define TABLE_MAX_PAGE 100
 #define INVALID_PAGE_NUM UINT32_MAX
 
-typedef enum { STATEMENT_INSERT, STATEMENT_SELECT, STATEMENT_SELECT_BY_ID, STATEMENT_DELETE_BY_ID} StatementType;
+typedef enum { STATEMENT_INSERT, STATEMENT_SELECT, STATEMENT_SELECT_BY_ID, STATEMENT_DELETE_BY_ID, STATEMENT_UPDATE_BY_ID} StatementType;
 typedef enum { NODE_LEAF, NODE_INTERNAL} NodeType;
 
 typedef struct{
@@ -32,6 +32,8 @@ typedef struct {
   StatementType type;
   uint32_t key;
   Row row_to_insert;
+  bool update_user_name;
+  bool update_email;
 } Statement;
 typedef struct{
   Table* table;
@@ -161,7 +163,7 @@ Pager* pager_open(const char* filename){
   return pager;
 }
 void print_row(Row row){
-  printf("(%d, %s, %s)\n", row.id, row.user_name, row.email);
+  printf("| %-*d | %*s | %*s |\n", 5, row.id, 10, row.user_name, 25, row.email);
 }
 bool prepare_statement(InputBuffer* inp_buf, Statement* stm){
   if (strncmp(inp_buf->buffer, "insert", 6)==0){
@@ -185,6 +187,44 @@ bool prepare_statement(InputBuffer* inp_buf, Statement* stm){
       return true;
     } else if (sscanf(inp_buf->buffer, "select id=%d", &(stm->key))==1){
       stm->type = STATEMENT_SELECT_BY_ID;
+      return true;
+    }
+  }
+  if (strncmp(inp_buf->buffer, "update set", 10)==0){
+    stm->type = STATEMENT_UPDATE_BY_ID;
+    stm->update_user_name = false;
+    stm->update_email = false;
+    char* user_name = strstr(inp_buf->buffer, "user_name=");
+    char* email = strstr(inp_buf->buffer, "email=");
+    if ((user_name)&&(email)){
+      if (user_name>email){
+        if (sscanf(inp_buf->buffer, "update set email=%s user_name=%s where id=%d",
+        stm->row_to_insert.email, stm->row_to_insert.user_name, &(stm->row_to_insert.id))<3){
+          return false;
+        }
+        stm->update_user_name = true;
+        stm->update_email = true;
+        return true;
+      } else {
+        if (sscanf(inp_buf->buffer, "update set user_name=%s email=%s where id=%d",
+        stm->row_to_insert.user_name, stm->row_to_insert.email, &(stm->row_to_insert.id))<3){
+          return false;
+        }
+        stm->update_user_name = true;
+        stm->update_email = true;
+        return true;
+      }
+    } else if (user_name){
+      if (sscanf(inp_buf->buffer, "update set user_name=%s where id=%d", stm->row_to_insert.user_name, &(stm->row_to_insert.id))<2){
+        return false;
+      }
+      stm->update_user_name = true;
+      return true;
+    } else if (email){
+      if (sscanf(inp_buf->buffer, "update set email=%s where id=%d", stm->row_to_insert.email, &(stm->row_to_insert.id))<2){
+        return false;
+      }
+      stm->update_email = true;
       return true;
     }
   }
@@ -497,26 +537,23 @@ void recursive_print(Table* table, uint32_t page_num){
   void* node = get_page(table->pager, page_num);
   uint32_t num_cells = *leaf_node_num_cells(node);
   if (node_type(node)==NODE_LEAF){
-    printf("Node leaf: %d\n", page_num);
     Row row;
     for (uint32_t i=0; i<num_cells; i++){
       deserialize_row(&row, leaf_node_value(node, i));
       print_row(row);
     }
   } else {
-    printf("page num %d\n", page_num);
-    printf("[");
-    for (uint32_t i=0; i<num_cells; i++){
-      printf("%d, ", *internal_node_key(node, i));
-    }
-    printf("]\n");
     for (uint32_t i=0; i<=num_cells; i++){
       recursive_print(table, *internal_node_child(node, i));
     }
   }
 }
 void execute_select(Table* table){
+  printf("__________________________________________________\n");
+  printf("| %-*s | %*s | %*s |\n", 5, "ID", 10, "USER_NAME", 25, "EMAIL");
+  printf("| %-*s | %-*s | %*s |\n", 5, "-----", 10, "----------", 25, "-------------------------");
   recursive_print(table, table->root_page_num);
+  printf("--------------------------------------------------\n");
 }
 void update_internal_node(Pager* pager, uint32_t page_num, uint32_t new_key) {
   void* node = get_page(pager, page_num);
@@ -713,13 +750,33 @@ bool execute_statement(Statement* stm, Table* table){
       if ((*leaf_node_key(node, cur->cell_num)==stm->key)&&(*leaf_node_num_cells(node)>cur->cell_num)){
         Row row;
         deserialize_row(&row, leaf_node_value(node, cur->cell_num));
+        printf("__________________________________________________\n");
+        printf("| %-*s | %*s | %*s |\n", 5, "ID", 10, "USER_NAME", 25, "EMAIL");
+        printf("| %-*s | %-*s | %*s |\n", 5, "-----", 10, "----------", 25, "-------------------------");
         print_row(row);
       } else {
         printf("not found row when id = %d\n", stm->key);
       }
+      free(cur);
       return true;
     case STATEMENT_DELETE_BY_ID:
       return execute_delete(table, stm->key);
+    case STATEMENT_UPDATE_BY_ID:
+      Cursor* cur_to_update = table_find(table, stm->row_to_insert.id, table->root_page_num);
+      void* node_to_update = get_page(table->pager, cur_to_update->page_num);
+      if ((*leaf_node_key(node_to_update, cur_to_update->cell_num)!=stm->row_to_insert.id)||(*leaf_node_num_cells(node_to_update)<=cur_to_update->cell_num)){
+        printf("not found row when id = %d\n", stm->row_to_insert.id);
+        free(cur_to_update);
+        return false;
+      }
+      if (stm->update_email){
+        memcpy(leaf_node_value(node_to_update, cur_to_update->cell_num)+EMAIL_OFFSET, &(stm->row_to_insert.email), EMAIL_SIZE);
+      }
+      if (stm->update_user_name){
+        memcpy(leaf_node_value(node_to_update, cur_to_update->cell_num)+USERNAME_OFFSET, &(stm->row_to_insert.user_name), USERNAME_SIZE);
+      }
+      free(cur_to_update);
+      return true;
   }
 }
 
