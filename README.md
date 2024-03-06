@@ -54,16 +54,23 @@ First, run the following commands to compile the code:
 ```
 
 Initially our table has nothing:
+
 ![image](https://github.com/Hoaihx123/Build-mini-Database/assets/99666261/d011b428-14cf-4c38-a50b-cb403de693d4)
+
 So now we start inserting new rows.
+
 ![image](https://github.com/Hoaihx123/Build-mini-Database/assets/99666261/16a7d4ca-8ae5-446b-aeae-35659978addf)
+
 Try **`select`** command:
+
 ![image](https://github.com/Hoaihx123/Build-mini-Database/assets/99666261/fbfe1fdd-7438-4860-8b9d-feb4c4ace9ed)
+
 But so that after restarting the program the next time the data is still there, we need run the **`.exit`** command.
 
 Now I will look at my **`data.db`** file using the **`hexdump`** command, each number in picture corresponds to 4 bits, so 2 consecutive numbers will be 1 byte.
 
 ![image](https://github.com/Hoaihx123/Build-mini-Database/assets/99666261/e28fae6c-8c3f-41a9-9f2c-71c832e6aa1e)
+
 - Let's look at the first byte: **`01`** - which is the byte containing the **is_root**.
 - The next byte is **`00`** - this value means the node under considerations is a `leaf node`.
 - The next 4 bytes are the page number of the parent page - **`0000 0000`**.
@@ -80,11 +87,14 @@ Our page 0 is still the root but has become an internal node, it contains a key 
 
 Okay, now let's try the other functions!
 - **Search by id function:**
+
 ![image](https://github.com/Hoaihx123/Build-mini-Database/assets/99666261/da2406ea-eb36-4e7e-bfeb-7b211d0775a9)
 
 - **Delete row:**
+
 ![image](https://github.com/Hoaihx123/Build-mini-Database/assets/99666261/67cdbd6e-7301-4a92-842f-c34e87fe2c3e)
 - **Update row:**
+
 ![image](https://github.com/Hoaihx123/Build-mini-Database/assets/99666261/4df81fdf-f0ef-40e3-b773-f045ab4f9100)
 
 
