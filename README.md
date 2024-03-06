@@ -1,11 +1,11 @@
 
 # Build a mini DBMS
-A simple DBMS written in C on Ubuntu with a B+ tree implementation
+A simple DBMS written in C on Ubuntu with a B+ tree implementation.
 
 ## Purpose
 
 - Basic understanding of how databases work on hard drives.
-- Understand search algorithms using database indexes on metadata
+- Understand search algorithms using database indexes on metadata.
 
 ## Description
 
@@ -21,7 +21,7 @@ So, In this application, I only deploy a database consisting of 1 table and basi
 - select id=`id` - search for lines by id
 - delete id=`id` - delete row by id
 - update set user_name=`new_username` email=`new_email` where id=`id` - update username or email (or both) by id
-- .exit - exit and save the data
+- .exit - exit and save the data.
 
 The application is written in C, data is deployed in B+ tree and saved in data.db file.
 We read and flush data into the file through structs Pager. Pager contains an array of pointers to pages as the page is read from the hard drive, each page is 4 kb long and stores the data of a node in B-tree.
